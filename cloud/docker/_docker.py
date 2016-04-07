@@ -390,6 +390,13 @@ options:
     required: false
     default: null
     version_added: "2.1"
+  oom_score_adj:
+    description:
+      - OOM score for container
+        Requires docker >= 1.10.0
+    required: false
+    default: 0
+    version_added: "2.1"
 
 author:
     - "Cove Schneider (@cove)"
@@ -398,6 +405,7 @@ author:
     - "Thomas Steinbach (@ThomasSteinbach)"
     - "Philippe Jandot (@zfil)"
     - "Daan Oosterveld (@dusdanig)"
+    - "Alexey Wasilyev (@awasilyev)"
 requirements:
     - "python >= 2.6"
     - "docker-py >= 0.3.0"
@@ -1637,6 +1645,7 @@ class DockerManager(object):
                   }
         if self.ensure_capability('host_config', fail=False):
             params['host_config'] = self.create_host_config()
+            params['host_config']['OomScoreAdj'] = self.module.params.get('oom_score_adj')
 
         #For v1.19 API and above use HostConfig, otherwise use Config
         if docker.utils.compare_version('1.19', api_version) < 0:
@@ -1896,6 +1905,7 @@ def main():
             read_only       = dict(default=None, type='bool'),
             labels          = dict(default={}, type='dict'),
             stop_timeout    = dict(default=10, type='int'),
+            oom_score_adj   = dict(default=0, type='int'),
             timeout         = dict(required=False, default=DEFAULT_TIMEOUT_SECONDS, type='int'),
             ulimits         = dict(default=None, type='list'),
         ),
