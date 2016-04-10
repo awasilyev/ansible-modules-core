@@ -148,7 +148,7 @@ options:
   memory_limit:
     description:
       - RAM allocated to the container as a number of bytes or as a human-readable
-        string like "512MB". Leave as "0" to specify no limit.
+        string like "512MB" or like "1.5 Gb". Leave as "0" to specify no limit.
     default: 0
   docker_url:
     description:
@@ -533,6 +533,7 @@ except ImportError:
     # python3
     from urllib.parse import urlparse
 
+import re
 try:
     import docker.client
     import docker.utils
@@ -556,22 +557,30 @@ if HAS_DOCKER_PY:
         DEFAULT_DOCKER_API_VERSION = docker.client.DEFAULT_DOCKER_API_VERSION
         DEFAULT_TIMEOUT_SECONDS = docker.client.DEFAULT_TIMEOUT_SECONDS
 
+def _human_to_bytes_coerce_token(token):
+    token = token.strip()
+    if re.match(r'\d+\.\d+', token):
+        return float(token)
+    elif token.isdigit():
+        return int(token)
+    else:
+        return token
 
 def _human_to_bytes(number):
-    suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    suffixes = ['b','k','m','g','t','p']
+    # split input into tokens; if a dot is appeared in number then convert it to float
+    tokens = [_human_to_bytes_coerce_token(t) for t in re.split(r'(\d+(?:\.\d+)?)', str(number)) if t != '']
 
-    if isinstance(number, int):
-        return number
-    if number[-1] == suffixes[0] and number[-2].isdigit():
-        return number[:-1]
-
-    i = 1
-    for each in suffixes[1:]:
-        if number[-len(each):] == suffixes[i]:
-            return int(number[:-len(each)]) * (1024 ** i)
-        i = i + 1
-
-    raise ValueError('Could not convert %s to integer' % (number,))
+    if tokens and isinstance(tokens[0], (int, long, float)):
+        if len(tokens) == 1:
+            return int(tokens[0])
+        if len(tokens) == 2 and isinstance(tokens[1], basestring):
+            try:
+                ndx = suffixes.index(tokens[1][0].lower())
+            except:
+                raise ValueError('Wrong suffix in %s (%s)' % (number, tokens[1][0]))
+            return int(tokens[0] * 1024**ndx)
+    raise ValueError('Could not convert %s to integer' % number)
 
 
 def _ansible_facts(container_list):
@@ -1265,7 +1274,7 @@ class DockerManager(object):
             else:
                 actual_mem = container['Config']['Memory']
 
-            if expected_mem and actual_mem != expected_mem:
+            if actual_mem != expected_mem:
                 self.reload_reasons.append('memory ({0} => {1})'.format(actual_mem, expected_mem))
                 differing.append(container)
                 continue
