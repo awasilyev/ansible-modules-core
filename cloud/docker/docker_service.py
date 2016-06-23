@@ -610,7 +610,7 @@ class ContainerManager(DockerBaseClass):
             result.update(self.cmd_restart(service_names))
 
         if self.scale:
-            result.update(self.cmd_scale())
+            result.update(self.cmd_scale(service_names))
 
         for service in self.project.services:
             result['ansible_facts'][service.name] = dict()
@@ -745,14 +745,14 @@ class ContainerManager(DockerBaseClass):
 
         return result
 
-    def cmd_scale(self):
+    def cmd_scale(self,service_names):
         result = dict(
             changed=False,
             actions=dict()
         )
 
         for service in self.project.services:
-            if service.name in self.scale:
+            if service.name in self.scale and (not service_names or service.name in service_names):
                 result['actions'][service.name] = dict()
                 containers = service.containers(stopped=True)
                 if len(containers) != self.scale[service.name]:
